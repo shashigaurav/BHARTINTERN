@@ -2,172 +2,148 @@ const express = require('express');
 const dotenv = require('dotenv');
 const path = require('path');
 const bodyParser = require('body-parser');
-const User = require('./models/User.js');
 const cookieParser = require('cookie-parser');
-const { default: mongoose } = require('mongoose');
+const mongoose = require('mongoose');
+const User = require('./models/User');
+
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 8080;
 
-// app.use(express.static(path.join(__dirname, 'public')));
-
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 
 app.use(cookieParser());
-app.use(bodyParser.urlencoded({ extended: false }))
-app.use(bodyParser.json())
+app.use(bodyParser.urlencoded({ extended: false }));
+app.use(bodyParser.json());
 
-
-
-app.get('/', (req, res) => {
-  return res.render('index', { message: "", user: '' });
+// Middleware for error handling
+app.use((err, req, res, next) => {
+  console.error(err.stack);
+  res.status(500).send('Something broke!');
 });
 
-app.get('/register', (req, res) => {
-  return res.render('register', { message: "Create your Account", user: '' });
-});
-app.get('/login', (req, res) => {
-  return res.render('login', { message: "Login with your Account", user: '' });
-});
+// Middleware for checking if user is logged in
+const checkLoggedIn = (req, res, next) => {
+  if (!req.cookies.user) {
+    return res.render('expense', { message: 'Please login first' });
+  }
+  next();
+};
 
-app.get('/expense', (req, res) => {
-  return res.render('expense', { message: '', user: '' });
-});
+// Middleware for validating required fields
+const validateFields = (req, res, next) => {
+  const { desc, amount } = req.body;
+  if (!desc || !amount) {
+    return res.render('expense', { message: 'Please fill all fields' });
+  }
+  next();
+};
 
+// Routes
+app.get('/', (req, res) => res.render('index', { message: '', user: '' }));
+
+app.get('/register', (req, res) => res.render('register', { message: 'Create your account', user: '' }));
+
+app.get('/login', (req, res) => res.render('login', { message: 'Login with your account', user: '' }));
+
+app.get('/expense', (req, res) => res.render('expense', { message: '', user: '' }));
 
 app.post('/register', async (req, res) => {
-
   try {
     const { name, email, password } = req.body;
 
     if (!name || !email || !password) {
-      return res.render('register', {
-        message: "Please Fill all Fields"
-      })
+      return res.render('register', { message: 'Please fill all fields' });
     }
+
     const user = await User.findOne({ email });
 
-    if (user)
-      return res.render('register', {
-        message: "You are Already registered."
-      })
+    if (user) {
+      return res.render('register', { message: 'You are already registered.' });
+    }
 
     await User.create({ name, email, password });
 
-    let message = "Registred Successfully";
-
-    return res.render('index', {
-      message,
-      user: name
-    })
+    return res.render('index', { message: 'Registered successfully', user: name });
 
   } catch (error) {
     console.error(error.message);
-    return res.render('register', {
-      message: error.message
-    })
+    return res.render('register', { message: error.message });
   }
-})
-
+});
 
 app.post('/login', async (req, res) => {
-
   try {
     const { email, password } = req.body;
 
     if (!email || !password) {
-      return res.render('login', {
-        message: "Please Fill all Fields"
-      })
+      return res.render('login', { message: 'Please fill all fields' });
     }
 
     const user = await User.findOne({ email });
 
-    if (!user)
-      return res.render('login', {
-        message: "You are Not registered."
-      })
+    if (!user) {
+      return res.render('login', { message: 'You are not registered.' });
+    }
 
-    if (user.password !== password)
-      return res.render('login', {
-        message: "Incorrect Password."
-      })
+    if (user.password !== password) {
+      return res.render('login', { message: 'Incorrect password.' });
+    }
 
     res.cookie('user', user._id, { maxAge: 24 * 60 * 60 * 1000 });
-    return res.render('index', {
-      message: "Login Successfully",
-      user: user.name
-    })
-
+    return res.render('index', { message: 'Login successful', user: user.name });
 
   } catch (error) {
-    // return res.render('register', {
-    //   message: error.message
-    // })
     console.error(error.message);
+    return res.render('login', { message: error.message });
   }
-})
+});
 
-app.post('/expense', async (req, res) => {
+app.post('/expense', checkLoggedIn, validateFields, async (req, res) => {
   try {
-
-    if (!req.cookies.user) {
-      return res.render('expense', { message: "Please Login first" })
-    }
-
     const { desc, amount } = req.body;
-    if (!desc || !amount) {
-      return res.render('expense', { message: "Please fill all feilds" });
-    }
     const user = await User.findById(req.cookies.user);
 
     if (!user) {
       res.cookie('user', '', { maxAge: 0 });
-      return res.render('expense', { message: "Session Expired, Please Login in again" });
+      return res.render('expense', { message: 'Session expired, please log in again' });
     }
-    console.log(user);
+
     user.expenses.push({ desc, amount });
-
     await user.save();
-    res.render('expense', { message: "Expense Added Successfully" })
+
+    return res.render('expense', { message: 'Expense added successfully' });
+
   } catch (error) {
-    return res.render('expense', { message: error.message })
+    console.error(error.message);
+    return res.render('expense', { message: error.message });
   }
-})
+});
 
-
-app.get('/expenses', async (req, res) => {
+app.get('/expenses', checkLoggedIn, async (req, res) => {
   try {
-
-    if (!req.cookies.user) {
-      return res.render('expense', { message: "Please Login first" })
-    }
-
     const user = await User.findById(req.cookies.user);
-
     if (!user) {
       res.cookie('user', '', { maxAge: 0 });
-      return res.render('expense', { message: "Session Expired, Please Login in again" });
+      return res.render('expense', { message: 'Session expired, please log in again' });
     }
     res.json([...user.expenses]);
   } catch (error) {
-    return res.render('expense', { message: error.message })
+    console.error(error.message);
+    return res.render('expense', { message: error.message });
   }
-})
+});
 
-
-
-
-app.listen(PORT, async () => {
-
-  try {
-    await mongoose.connect(process.env.MONGO_URI);
+mongoose.connect(process.env.MONGO_URI)
+  .then(() => {
     console.log('DB Connected Successfully');
-  } catch (error) {
-    console.log(error.message);
-  }
-
-  console.log(`Server is Running http://localhost:${PORT}`);
-})
+    app.listen(PORT, () => {
+      console.log(`Server is running on http://localhost:${PORT}`);
+    });
+  })
+  .catch(error => {
+    console.error(error.message);
+    process.exit(1);
+  });
