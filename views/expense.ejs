@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Expense Tracker</title>
+    <style>
+        body {
+            background-color: white;
+            color: black;
+            font-family: 'Gill Sans', 'Gill Sans MT', Calibri, 'Trebuchet MS', sans-serif;
+            margin: 0;
+            padding: 0;
+        }
+
+        .page {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+        }
+
+        h1 {
+            margin-bottom: 20px;
+        }
+
+        .forms-section {
+            width: 80%;
+            display: flex;
+            justify-content: space-between;
+            gap: 20;
+            flex-wrap: wrap;
+        }
+
+        .expense-form {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background-color: #fff;
+            border: 1px solid #000;
+            padding: 20px;
+            border-radius: 8px;
+            width: 300px;
+        }
+
+        .expense-form .inputs {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .inputs input {
+            margin-bottom: 10px;
+            padding: 8px;
+            border: 1px solid black;
+            border-radius: 4px;
+            width: 200px;
+            box-sizing: border-box;
+        }
+
+        .inputs label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+        }
+
+        .expense-button {
+            background-color: black;
+            color: white;
+            padding: 10px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+
+        .expense-list {
+            width: 300px;
+            height: 100%;
+            border: 1px solid #000;
+            padding: 20px;
+            list-style-type: none;
+            max-height: 300px;
+            overflow-y: auto;
+            border-radius: 8px;
+        }
+
+        .expense-item {
+            display: flex;
+            justify-content: space-between;
+            border: 1px solid rgba(0, 0, 0, 0.281);
+            background: #0000005a;
+            border-radius: 4px;
+            padding: 10px;
+            color: #ffffff;
+            margin-bottom: 10px;
+        }
+
+        .expense-item span {
+            font-size: 20px;
+        }
+    </style>
+</head>
+
+<body>
+    <%- include('./partials/_header'); %>
+        <div class="page">
+
+            <%- include('./partials/_message'); %>
+                <div class="forms-section">
+                    <form class="expense-form" method="post" action="/expense">
+                        <div class="inputs">
+                            <label for="email">Expense description:</label>
+                            <input type="text" class="expense-input" name="desc" placeholder="Expense description">
+                        </div>
+                        <div class="inputs">
+                            <label for="email">Amount:</label>
+                            <input type="number" class="expense-input" name="amount" placeholder="Amount">
+                        </div>
+                        <button class="expense-button" type="submit">Add Expense</button>
+                    </form>
+
+                    <ul class="expense-list">
+                    </ul>
+
+                </div>
+        </div>
+
+        <script>
+            const list = document.querySelector('.expense-list');
+
+            const fetchExpenses = async () => {
+                try {
+                    const res = await fetch('/expenses');
+                    const expenses = await res.json();
+
+                    if (expenses.length)
+                        expenses.forEach(element => {
+                            list.innerHTML += `<li class="expense-item">
+                                                <span>${element.desc}</span>
+                                                <span>₹${element.amount}</span>
+                                            </li>`;
+                        });
+                    else {
+                        list.innerHTML += `<li class="expense-item">No Expenses Found</li>`
+                    }
+                } catch (error) {
+                    console.error('Error fetching expenses:', error);
+                }
+            }
+
+            fetchExpenses();
+        </script>
+</body>
+
+</html>
